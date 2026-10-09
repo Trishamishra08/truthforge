@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import multer from "multer";
 import { getGeminiClient, generateWithFallback, extractJson, describeGeminiError } from "../services/geminiClient.js";
 import MediaAnalysis, { MEDIA_CATEGORY_VALUES } from "../models/MediaAnalysis.js";
+import { detectAIImage, FORENSIC_MODEL } from "../services/forensicDetector.js";
+import { combineMediaVerdict } from "../services/mediaVerdict.js";
 
 const router = express.Router();
 
@@ -49,7 +51,7 @@ Rules:
 - category must be exactly one of: ${MEDIA_CATEGORY_VALUES.join(", ")}.`;
 
 const BASE_LIMITATION =
-  "AI-generated media detection is probabilistic. Compression, editing, new generation methods, and unfamiliar media can reduce accuracy. This result is an automated assessment by a general multimodal model, not a dedicated forensic classifier, and is not definitive proof of authenticity or fabrication.";
+  "The multimodal model's opinion comes from visual reasoning by a general-purpose AI, not a forensic tool.";
 
 router.post("/analyze", upload.single("file"), async (req, res) => {
   if (!req.file) {
@@ -64,37 +66,50 @@ router.post("/analyze", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "Image too large. Maximum size is 5MB." });
   }
 
-  if (!getGeminiClient()) {
-    return res.status(503).json({ error: "AI provider unavailable: GEMINI_API_KEY is not configured on the server." });
+  const isImage = detected.mediaType === "image";
+  const geminiTask = getGeminiClient()
+    ? generateWithFallback(
+        [PROMPT(detected.mediaType), { inlineData: { mimeType: detected.mimeType, data: req.file.buffer.toString("base64") } }],
+        { timeout: isImage ? 90000 : 120000 }
+      ).then(({ text, modelName }) => ({ parsed: extractJson(text), modelName }))
+    : Promise.reject(new Error("GEMINI_API_KEY is not configured"));
+  const forensicTask = isImage ? detectAIImage(req.file.buffer, detected.mimeType) : Promise.resolve(null);
+
+  const [gem, forensicResult] = await Promise.allSettled([geminiTask, forensicTask]);
+  const gemini = gem.status === "fulfilled" ? gem.value : null;
+  const forensic = forensicResult.status === "fulfilled" ? forensicResult.value : null;
+  if (gem.status === "rejected") console.error("Gemini media analysis failed:", gem.reason?.message);
+  if (forensicResult.status === "rejected") console.error("Forensic model failed:", forensicResult.reason?.message);
+
+  if (!gemini && !forensic) {
+    return res.status(502).json({ error: gem.status === "rejected" ? describeGeminiError(gem.reason) : "Media analysis failed. Please retry." });
   }
 
-  try {
-    const { text, modelName } = await generateWithFallback(
-      [PROMPT(detected.mediaType), { inlineData: { mimeType: detected.mimeType, data: req.file.buffer.toString("base64") } }],
-      { timeout: detected.mediaType === "video" ? 120000 : 90000 }
-    );
-    const parsed = extractJson(text);
+  const geminiCategory = gemini && MEDIA_CATEGORY_VALUES.includes(gemini.parsed.category) ? gemini.parsed.category : gemini ? "INCONCLUSIVE" : null;
+  const { category, reason } = combineMediaVerdict(geminiCategory, forensic?.fakeProbability);
 
-    const analysis = await MediaAnalysis.create({
-      user: req.user._id,
-      mediaType: detected.mediaType,
-      fileName: req.file.originalname,
-      mimeType: detected.mimeType,
-      sizeBytes: req.file.size,
-      category: MEDIA_CATEGORY_VALUES.includes(parsed.category) ? parsed.category : "INCONCLUSIVE",
-      explanation: parsed.explanation || "No explanation returned.",
-      observations: Array.isArray(parsed.observations) ? parsed.observations.filter((o) => typeof o === "string").slice(0, 5) : [],
-      modelName,
-      limitations: [parsed.limitations, BASE_LIMITATION,
-        detected.mediaType === "video" ? "Video is assessed visually from sampled frames; synthetic voice and audio manipulation are not evaluated." : null,
-      ].filter(Boolean).join(" "),
-    });
+  const analysis = await MediaAnalysis.create({
+    user: req.user._id,
+    mediaType: detected.mediaType,
+    fileName: req.file.originalname,
+    mimeType: detected.mimeType,
+    sizeBytes: req.file.size,
+    category,
+    decisionReason: reason,
+    geminiCategory,
+    forensic: forensic
+      ? { available: true, model: forensic.model, variant: forensic.variant, score: forensic.fakeProbability }
+      : { available: false, model: FORENSIC_MODEL, note: isImage ? "The dedicated detector could not run on this file." : "The dedicated detector supports images only." },
+    explanation: gemini?.parsed.explanation || "The multimodal model was unavailable, so no visual explanation was generated. The category comes from the dedicated detector alone.",
+    observations: Array.isArray(gemini?.parsed.observations) ? gemini.parsed.observations.filter((o) => typeof o === "string").slice(0, 5) : [],
+    modelName: gemini?.modelName,
+    limitations: [gemini?.parsed.limitations, BASE_LIMITATION,
+      forensic ? "The dedicated detector's score is a model output, not a calibrated probability; it can miss stylized or artistic AI images and does not detect manual edits." : null,
+      !isImage ? "Video is assessed visually from sampled frames by the multimodal model; synthetic voice and audio manipulation are not evaluated." : null,
+    ].filter(Boolean).join(" "),
+  });
 
-    res.status(201).json(analysis);
-  } catch (err) {
-    console.error("Media analysis failed:", err.message);
-    res.status(502).json({ error: describeGeminiError(err) });
-  }
+  res.status(201).json(analysis);
 });
 
 router.get("/", async (req, res) => {
