@@ -1,8 +1,9 @@
-import { Component, Suspense, lazy, useRef, useState } from "react";
+import { Component, Suspense, lazy, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
-import { ArrowRight, FileText, Link2, LoaderCircle, Menu, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, Bookmark, FileText, Link2, LoaderCircle, LogIn, LogOut, Menu, Sparkles, TriangleAlert, X } from "lucide-react";
 import { Logo, VERDICTS } from "../components/ui";
 import { scrollToId, useMotionPrefs } from "../lib/motionPrefs";
+import { useAuth } from "../lib/auth";
 
 const Hero3D = lazy(() => import("../components/Hero3D"));
 
@@ -53,6 +54,62 @@ function HeadlineIcon() {
 }
 
 const headlineLines = [["Know"], ["icon", "What's"], ["True."]];
+
+function AccountButton({ onReports }) {
+  const { user, checking, openAuth, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (checking) return <span className="size-8 animate-pulse rounded-full bg-white/15" aria-label="Checking session" />;
+
+  if (!user) {
+    return (
+      <button type="button" onClick={() => openAuth("login")}
+        className="inline-flex items-center gap-1.5 rounded-full bg-ivory px-3.5 py-1.5 text-[13px] text-ink transition-colors hover:bg-lime">
+        <LogIn className="size-3.5" /> Log in
+      </button>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}
+        className="inline-flex items-center gap-2 rounded-full border border-white/40 py-1 pl-1 pr-1 text-[13px] text-ivory transition-colors hover:bg-white/10 xl:pr-3">
+        <span className="grid size-7 place-items-center rounded-full bg-lime text-xs font-medium uppercase text-ink">{user.name.trim()[0]}</span>
+        <span className="hidden max-w-[120px] truncate xl:inline">{user.name}</span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div role="menu" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-2xl border border-ink/10 bg-ivory text-ink shadow-[0_20px_50px_-20px_rgba(0,0,0,0.5)]">
+            <div className="border-b border-ink/10 px-4 py-3">
+              <p className="truncate text-sm">{user.name}</p>
+              <p className="truncate text-xs text-ink/55">{user.email}</p>
+            </div>
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); onReports(); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-white">
+              <Bookmark className="size-4" /> My saved reports
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); logout(); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-ember hover:bg-white">
+              <LogOut className="size-4" /> Log out
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function GlancePanel({ loading, result, stats }) {
   const claims = result?.claims ?? [];
@@ -210,13 +267,14 @@ export default function HeroSection({ onAnalyze, loading, error, result, stats }
           </nav>
 
           <div className="z-10 flex items-center gap-2">
-            <button type="button" onClick={() => go("media")} className="hidden rounded-full border border-white/40 px-4 py-1.5 text-[13px] text-ivory transition-colors hover:bg-white/10 sm:inline-flex lg:hidden xl:inline-flex">
+            <button type="button" onClick={() => go("media")} className="hidden rounded-full border border-white/40 px-4 py-1.5 text-[13px] text-ivory transition-colors hover:bg-white/10 sm:inline-flex lg:hidden 2xl:inline-flex">
               Analyze media
             </button>
-            <button type="button" onClick={() => go("verify")} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-3 py-1.5 text-[13px] text-ivory transition-colors hover:bg-ivory hover:text-ink">
+            <button type="button" onClick={() => go("verify")} className="hidden items-center gap-2 rounded-full border border-white/40 px-3 py-1.5 text-[13px] text-ivory transition-colors hover:bg-ivory hover:text-ink sm:inline-flex lg:hidden xl:inline-flex">
               <span className="grid size-4 place-items-center rounded-full bg-ivory text-ink"><ArrowRight className="size-3" /></span>
               Verify news
             </button>
+            <AccountButton onReports={() => go("reports")} />
             <button type="button" className="rounded-full p-2 text-ivory lg:hidden" aria-expanded={menuOpen} aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
               {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
             </button>

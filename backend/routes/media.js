@@ -76,6 +76,7 @@ router.post("/analyze", upload.single("file"), async (req, res) => {
     const parsed = extractJson(text);
 
     const analysis = await MediaAnalysis.create({
+      user: req.user._id,
       mediaType: detected.mediaType,
       fileName: req.file.originalname,
       mimeType: detected.mimeType,
@@ -96,8 +97,8 @@ router.post("/analyze", upload.single("file"), async (req, res) => {
   }
 });
 
-router.get("/", async (_req, res) => {
-  const analyses = await MediaAnalysis.find()
+router.get("/", async (req, res) => {
+  const analyses = await MediaAnalysis.find({ user: req.user._id })
     .select("mediaType fileName category createdAt")
     .sort({ createdAt: -1 })
     .limit(50);
@@ -106,14 +107,14 @@ router.get("/", async (_req, res) => {
 
 router.get("/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Report not found." });
-  const analysis = await MediaAnalysis.findById(req.params.id);
+  const analysis = await MediaAnalysis.findOne({ _id: req.params.id, user: req.user._id });
   if (!analysis) return res.status(404).json({ error: "Report not found." });
   res.json(analysis);
 });
 
 router.delete("/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Report not found." });
-  const deleted = await MediaAnalysis.findByIdAndDelete(req.params.id);
+  const deleted = await MediaAnalysis.findOneAndDelete({ _id: req.params.id, user: req.user._id });
   if (!deleted) return res.status(404).json({ error: "Report not found." });
   res.status(204).end();
 });

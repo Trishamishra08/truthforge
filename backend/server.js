@@ -2,13 +2,18 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
+import authRouter from "./routes/auth.js";
+import usersRouter from "./routes/users.js";
 import newsRouter from "./routes/news.js";
 import mediaRouter from "./routes/media.js";
 import insightsRouter from "./routes/insights.js";
+import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { GEMINI_MODELS } from "./services/geminiClient.js";
 
 const app = express();
+// Render/Vercel sit behind a proxy; needed so rate limiting sees the real client IP.
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
@@ -21,8 +26,10 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.use("/api/news", newsRouter);
-app.use("/api/media", mediaRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/users", requireAuth, usersRouter);
+app.use("/api/news", requireAuth, newsRouter);
+app.use("/api/media", requireAuth, mediaRouter);
 app.use("/api/insights", insightsRouter);
 
 app.use(errorHandler);

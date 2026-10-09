@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { useCanHover, useMotionPrefs } from "../lib/motionPrefs";
+import { useAuth } from "../lib/auth";
 
 // Layers fan out in x/z and twist slightly so each colour shows at the edges, like the reference.
 const SHEETS = [
@@ -206,6 +207,7 @@ export default function Hero3D() {
   const wrap = useRef(null);
   const [inView, setInView] = useState(true);
   const { motionOn } = useMotionPrefs();
+  const { modal } = useAuth();
   const canHover = useCanHover();
 
   useEffect(() => {
@@ -214,7 +216,8 @@ export default function Hero3D() {
     return () => io.disconnect();
   }, []);
 
-  const animate = motionOn && inView;
+  // Hidden behind the login modal, so stop rendering frames while it is open.
+  const animate = motionOn && inView && !modal;
 
   return (
     <div ref={wrap} className="h-full w-full" aria-hidden="true">

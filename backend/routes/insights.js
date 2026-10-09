@@ -2,15 +2,18 @@ import express from "express";
 import NewsAnalysis from "../models/NewsAnalysis.js";
 import MediaAnalysis from "../models/MediaAnalysis.js";
 import { searchNews } from "../services/newsSearch.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/stats", async (_req, res) => {
+router.get("/stats", requireAuth, async (req, res) => {
+  const mine = { $match: { user: req.user._id } };
   const [newsCount, mediaByType, verdicts, claimTotals] = await Promise.all([
-    NewsAnalysis.countDocuments(),
-    MediaAnalysis.aggregate([{ $group: { _id: "$mediaType", count: { $sum: 1 } } }]),
-    NewsAnalysis.aggregate([{ $group: { _id: "$verdict", count: { $sum: 1 } } }]),
+    NewsAnalysis.countDocuments({ user: req.user._id }),
+    MediaAnalysis.aggregate([mine, { $group: { _id: "$mediaType", count: { $sum: 1 } } }]),
+    NewsAnalysis.aggregate([mine, { $group: { _id: "$verdict", count: { $sum: 1 } } }]),
     NewsAnalysis.aggregate([
+      mine,
       { $unwind: "$claims" },
       { $group: { _id: null, claims: { $sum: 1 }, sources: { $sum: { $size: { $ifNull: ["$claims.evidence", []] } } } } },
     ]),
@@ -28,8 +31,9 @@ router.get("/stats", async (_req, res) => {
 
 // Aggregates how each publisher's reporting related to claims checked in this app.
 // This is usage data, not a credibility rating.
-router.get("/sources", async (_req, res) => {
+router.get("/sources", requireAuth, async (req, res) => {
   const sources = await NewsAnalysis.aggregate([
+    { $match: { user: req.user._id } },
     { $unwind: "$claims" },
     { $unwind: "$claims.evidence" },
     { $match: { "claims.evidence.publisher": { $nin: [null, ""] } } },

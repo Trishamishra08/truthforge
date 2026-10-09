@@ -8,6 +8,7 @@ const MEDIA_CATEGORIES = [
 ];
 
 const mediaAnalysisSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
   mediaType: { type: String, enum: ["image", "video"], required: true, default: "image" },
   fileName: { type: String, required: true },
   mimeType: { type: String, required: true },

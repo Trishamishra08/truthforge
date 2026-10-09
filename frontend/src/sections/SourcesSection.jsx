@@ -3,6 +3,7 @@ import { Globe } from "lucide-react";
 import DarkPanel from "../components/DarkPanel";
 import { SectionHeading, formatDate, staggerChild, staggerParent } from "../components/ui";
 import { scrollToId } from "../lib/motionPrefs";
+import { LoginPrompt } from "./ReportsSection";
 
 function Tile({ s }) {
   return (
@@ -15,7 +16,7 @@ function Tile({ s }) {
   );
 }
 
-export default function SourcesSection({ sources, error }) {
+export default function SourcesSection({ sources, error, loggedIn, onLogin }) {
   const list = sources ?? [];
   const max = Math.max(1, ...list.map((s) => s.citations));
   const loop = list.length >= 4;
@@ -26,7 +27,9 @@ export default function SourcesSection({ sources, error }) {
         Every publisher whose reporting turned up while verifying your claims. These are counts from your own reports — how coverage related to the claims you tested — not a credibility rating.
       </SectionHeading>
 
-      {error ? (
+      {!loggedIn ? (
+        <LoginPrompt dark onLogin={onLogin} what="the sources from your checks" />
+      ) : error ? (
         <p className="mt-10 text-sm text-white/60">Couldn't load sources: {error}</p>
       ) : sources === null ? (
         <div className="mt-10 flex gap-4 overflow-hidden">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton-dark h-24 w-64 shrink-0 rounded-2xl" />)}</div>

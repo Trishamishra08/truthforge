@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { FileText, Image as ImageIcon, LoaderCircle, Search, Trash2, Video } from "lucide-react";
+import { FileText, Image as ImageIcon, LoaderCircle, Lock, Search, Trash2, Video } from "lucide-react";
 import { MediaBadge, Reveal, SectionHeading, VerdictBadge, formatDate } from "../components/ui";
 import { scrollToId } from "../lib/motionPrefs";
 
@@ -18,7 +18,21 @@ function StatTile({ label, value, Icon }) {
   );
 }
 
-export default function ReportsSection({ news, media, stats, error, onOpen, onDelete }) {
+export function LoginPrompt({ onLogin, dark = false, what }) {
+  return (
+    <div className={`mt-10 rounded-[22px] border border-dashed p-10 text-center ${dark ? "border-white/25" : "border-ink/20 bg-white/50"}`}>
+      <span className={`mx-auto grid size-12 place-items-center rounded-full ${dark ? "bg-white/10" : "bg-ivory"}`}><Lock className="size-5" /></span>
+      <p className="mt-4 text-lg">Log in to see {what}.</p>
+      <p className={`mt-1 text-sm ${dark ? "text-white/55" : "text-ink/55"}`}>Reports are private to each account.</p>
+      <div className="mt-5 flex justify-center gap-3">
+        <button type="button" onClick={() => onLogin("login")} className={`rounded-full px-5 py-2 text-sm ${dark ? "bg-ivory text-ink" : "bg-ink text-ivory"}`}>Log in</button>
+        <button type="button" onClick={() => onLogin("register")} className={`rounded-full border px-5 py-2 text-sm ${dark ? "border-white/30" : "border-ink/20"}`}>Create account</button>
+      </div>
+    </div>
+  );
+}
+
+export default function ReportsSection({ news, media, stats, error, onOpen, onDelete, loggedIn, onLogin }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [confirming, setConfirming] = useState(null);
@@ -48,9 +62,10 @@ export default function ReportsSection({ news, media, stats, error, onOpen, onDe
   return (
     <section id="reports" aria-labelledby="reports-title" className="mx-auto max-w-[1440px] scroll-mt-6 px-4 py-24 sm:px-10">
       <SectionHeading id="reports-title" eyebrow="History" title={<>Saved<br />Reports.</>}>
-        Every analysis you run is saved to the database. Reopen a report to see its full evidence, or delete the ones you don't need.
+        Every analysis you run is saved privately to your account. Reopen a report to see its full evidence, or delete the ones you don't need.
       </SectionHeading>
 
+      {!loggedIn ? <LoginPrompt onLogin={onLogin} what="your saved reports" /> : (<>
       <Reveal className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Articles checked" value={stats?.articlesChecked} Icon={FileText} />
         <StatTile label="Claims checked" value={stats?.claimsChecked} Icon={Search} />
@@ -128,6 +143,7 @@ export default function ReportsSection({ news, media, stats, error, onOpen, onDe
           </ul>
         )}
       </Reveal>
+      </>)}
     </section>
   );
 }

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
 import * as api from "./api";
 import { MotionPrefsProvider, scrollToId } from "./lib/motionPrefs";
+import { AuthProvider, useAuth } from "./lib/auth";
+import AuthModal from "./components/AuthModal";
 import HeroSection from "./sections/HeroSection";
 import ResultsSection from "./sections/ResultsSection";
 import MediaSection from "./sections/MediaSection";
@@ -29,6 +31,8 @@ function Page() {
   const [trendingError, setTrendingError] = useState(null);
   const [history, setHistory] = useState({ news: null, media: null, error: null });
 
+  const { user, requireUser, openAuth } = useAuth();
+
   const refresh = useCallback(() => {
     api.getStats().then(setStats).catch(() => {});
     api.getSources().then((s) => { setSources(s); setSourcesError(null); }).catch((e) => setSourcesError(e.message));
@@ -43,11 +47,29 @@ function Page() {
   }, []);
 
   useEffect(() => {
-    refresh();
     loadTrending();
-  }, [refresh, loadTrending]);
+  }, [loadTrending]);
 
-  const analyzeNews = async (input) => {
+  // Everything except trending is per-user: load it on login, wipe it on logout.
+  useEffect(() => {
+    if (user) {
+      refresh();
+      return;
+    }
+    setStats(null);
+    setSources([]);
+    setSourcesError(null);
+    setHistory({ news: [], media: [], error: null });
+    setNews({ loading: false, error: null, result: null });
+    setMedia({ loading: false, error: null, result: null, fromHistory: false });
+  }, [user, refresh]);
+
+  const analyzeNews = (input) =>
+    requireUser(() => runNews(input), "Log in to verify news. Your report will be saved to your account.");
+  const analyzeMedia = (file) =>
+    requireUser(() => runMedia(file), "Log in to analyze media. Your report will be saved to your account.");
+
+  const runNews = async (input) => {
     setNews({ loading: true, error: null, result: null });
     scrollSoon("results");
     try {
@@ -60,7 +82,7 @@ function Page() {
     }
   };
 
-  const analyzeMedia = async (file) => {
+  const runMedia = async (file) => {
     setMedia({ loading: true, error: null, result: null, fromHistory: false });
     try {
       const result = await api.analyzeMedia(file);
@@ -114,15 +136,17 @@ function Page() {
             onClear={() => setMedia({ loading: false, error: null, result: null, fromHistory: false })}
           />
           <CapabilitiesSection />
-          <SourcesSection sources={sources} error={sourcesError} />
+          <SourcesSection sources={sources} error={sourcesError} loggedIn={Boolean(user)} onLogin={openAuth} />
         </div>
 
         <TrendingSection data={trending} error={trendingError} onRetry={loadTrending} />
-        <ReportsSection news={history.news} media={history.media} stats={stats} error={history.error} onOpen={openReport} onDelete={deleteReport} />
+        <ReportsSection news={history.news} media={history.media} stats={stats} error={history.error} onOpen={openReport} onDelete={deleteReport}
+          loggedIn={Boolean(user)} onLogin={openAuth} />
         <HowItWorks />
       </main>
 
       <Footer />
+      <AuthModal />
     </>
   );
 }
@@ -130,7 +154,9 @@ function Page() {
 export default function App() {
   return (
     <MotionPrefsProvider>
-      <Page />
+      <AuthProvider>
+        <Page />
+      </AuthProvider>
     </MotionPrefsProvider>
   );
 }

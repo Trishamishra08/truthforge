@@ -32,6 +32,7 @@ const claimSchema = new mongoose.Schema(
 );
 
 const newsAnalysisSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
   inputType: { type: String, enum: ["text", "url"], default: "text" },
   sourceUrl: { type: String },
   publisher: { type: String },

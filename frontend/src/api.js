@@ -1,28 +1,43 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-async function request(path, options) {
+let authToken = null;
+let onUnauthorized = () => {};
+
+export const setAuthToken = (token) => {
+  authToken = token;
+};
+export const setUnauthorizedHandler = (fn) => {
+  onUnauthorized = fn;
+};
+
+async function request(path, options = {}) {
+  const sentToken = authToken;
+  const headers = { ...(options.headers ?? {}), ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}) };
   let res;
   try {
-    res = await fetch(`${BASE_URL}${path}`, options);
+    res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   } catch {
     throw new Error("Can't reach the TruthForge server. Is the backend running?");
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401 && sentToken && !path.startsWith("/api/auth/")) onUnauthorized();
     const err = new Error(data.error || `Request failed (HTTP ${res.status})`);
+    err.status = res.status;
     err.canRetryWithText = Boolean(data.canRetryWithText);
     throw err;
   }
   return data;
 }
 
-export const analyzeNews = ({ text, url }) =>
-  request("/api/news/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(url ? { url } : { text }),
-  });
+const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+export const register = (name, email, password) => request("/api/auth/register", json("POST", { name, email, password }));
+export const login = (email, password) => request("/api/auth/login", json("POST", { email, password }));
+export const getMe = () => request("/api/users/me");
+
+export const analyzeNews = ({ text, url }) => request("/api/news/analyze", json("POST", url ? { url } : { text }));
 
 export function analyzeMedia(file) {
   const formData = new FormData();

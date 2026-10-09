@@ -143,6 +143,7 @@ router.post("/analyze", async (req, res) => {
 
     const publishedAt = article.publishedAt ? new Date(article.publishedAt) : null;
     const analysis = await NewsAnalysis.create({
+      user: req.user._id,
       inputType: hasUrl ? "url" : "text",
       sourceUrl: hasUrl ? article.canonicalUrl : null,
       publisher: article.publisher || null,
@@ -172,24 +173,25 @@ router.post("/analyze", async (req, res) => {
   }
 });
 
-router.get("/", async (_req, res) => {
-  const analyses = await NewsAnalysis.find()
+router.get("/", async (req, res) => {
+  const analyses = await NewsAnalysis.find({ user: req.user._id })
     .select("title publisher sourceUrl inputType verdict createdAt claims.status")
     .sort({ createdAt: -1 })
     .limit(50);
   res.json(analyses);
 });
 
+// Reports owned by someone else return 404, so their existence isn't revealed.
 router.get("/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Report not found." });
-  const analysis = await NewsAnalysis.findById(req.params.id);
+  const analysis = await NewsAnalysis.findOne({ _id: req.params.id, user: req.user._id });
   if (!analysis) return res.status(404).json({ error: "Report not found." });
   res.json(analysis);
 });
 
 router.delete("/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Report not found." });
-  const deleted = await NewsAnalysis.findByIdAndDelete(req.params.id);
+  const deleted = await NewsAnalysis.findOneAndDelete({ _id: req.params.id, user: req.user._id });
   if (!deleted) return res.status(404).json({ error: "Report not found." });
   res.status(204).end();
 });
