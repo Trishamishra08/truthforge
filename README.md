@@ -12,7 +12,16 @@ Paste article text **or an article URL** →
 4. Gemini labels each claim `SUPPORTED`, `CONTRADICTED`, `INSUFFICIENT_EVIDENCE`, `CONFLICTING_EVIDENCE` or `UNVERIFIABLE`, citing only retrieved results (ids it didn't receive are discarded).
 5. An **overall verdict** — Likely True, Mostly True, Misleading, Likely False, Disputed, Unverified — is computed from claim statuses by fixed rules in `backend/services/verdict.js` (not by the AI), so it is explainable.
 
-### 2. AI media detection
+### 2. AI media detection — two independent detectors
+For **images**, two detectors run in parallel:
+1. **Dedicated forensic model** — [Community Forensics ViT-Small](https://huggingface.co/buildborderless/CommunityForensics-DeepfakeDet-ViT) (Park & Owens, CVPR 2025; trained on 2.7M images from 4,800+ generators; MIT licence). Runs locally inside the Node backend via Transformers.js + ONNX Runtime (int8, 23 MB, ~0.8 s/image on CPU, ~175 MB RAM). Output: sigmoid score = AI-likelihood.
+2. **Multimodal model (Gemini)** — describes the visual signals it sees.
+
+The final category is chosen by fixed agreement rules in `backend/services/mediaVerdict.js` (score ≥ 0.85 = AI, ≤ 0.15 = real, otherwise unsure; both agree → that result; they contradict → Inconclusive; one unsure → the confident one decides). If Gemini is unavailable, images are still analysed by the dedicated model alone. Videos use Gemini only (the forensic model is image-only).
+
+Local sanity check on 12 Wikimedia Commons images (6 real photos, 6 Stable Diffusion/Midjourney): dedicated model 10/12 correct — all real photos correct, 2 stylized Midjourney images missed. This is a tiny sanity check, not a benchmark.
+
+### Media detection details
 Upload an **image** (JPEG/PNG/WebP ≤ 5 MB) or a **short video** (MP4/MOV/WebM ≤ 14 MB). The real format is detected from file signature bytes, not the declared type. Gemini returns a category — Likely AI-generated, Likely authentic, Possibly manipulated, Inconclusive — plus specific observations. For videos, observations carry timestamps and the frontend grabs those frames locally so you can inspect them. Files are processed in memory and **not stored**; only the report is saved.
 
 ### Accounts (JWT)
@@ -86,11 +95,11 @@ Single-page, motion-designed UI: ivory/peach background, black "browser frame" w
 
 ## Known limitations (state these in the viva)
 - Evidence is **news headlines only**; full articles aren't read, so a true claim can come back `INSUFFICIENT_EVIDENCE`.
-- Media detection uses a **general multimodal LLM**, not a dedicated benchmarked forensic classifier; its output is a heuristic, not a calibrated probability. Audio/voice is not assessed.
+- The dedicated image detector has not been benchmarked by us on a large dataset; its score is a model output, not a calibrated probability, and it can miss stylized AI art. Videos are screened by Gemini only. Audio/voice is not assessed.
 - Free-tier Gemini: ~20 requests/day/model and 10–60 s response times.
 - Gemini's built-in Google Search grounding isn't used — it has no free-tier quota.
 - URL extraction fails on paywalled or JavaScript-only pages (the UI offers "paste text instead").
 
 
 ## Future work
-PDF export, a dedicated AI-image detection model (e.g. a Hugging Face classifier in a Python microservice), full-article evidence reading, Google Fact Check Tools API.
+PDF export, benchmarking the detectors on a public dataset, a video-capable forensic model, full-article evidence reading, Google Fact Check Tools API.
