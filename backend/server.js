@@ -10,6 +10,7 @@ import insightsRouter from "./routes/insights.js";
 import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { GEMINI_MODELS } from "./services/geminiClient.js";
+import { warmUpForensicModel, FORENSIC_MODEL } from "./services/forensicDetector.js";
 
 const app = express();
 // Render/Vercel sit behind a proxy; needed so rate limiting sees the real client IP.
@@ -23,6 +24,7 @@ app.get("/api/health", (_req, res) => {
     mongoConnected: mongoose.connection.readyState === 1,
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
     geminiModels: GEMINI_MODELS,
+    forensicModel: FORENSIC_MODEL,
   });
 });
 
@@ -50,6 +52,7 @@ async function start() {
 
   app.listen(PORT, () => {
     console.log(`TruthForge backend running on http://localhost:${PORT}`);
+    warmUpForensicModel();
   });
 }
 
