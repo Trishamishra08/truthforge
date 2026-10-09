@@ -202,6 +202,37 @@ export default function MediaSection({ onAnalyze, loading, error, result, fromHi
                 <p className="mt-3 text-sm leading-relaxed">{result.explanation}</p>
               </motion.div>
 
+              <motion.div variants={staggerChild}>
+                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/50">Two independent detectors</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-white/15 p-4">
+                    <p className="text-sm">Dedicated detector</p>
+                    <p className="text-[11px] text-white/45">Community Forensics ViT · CVPR 2025</p>
+                    {result.forensic?.available ? (
+                      <>
+                        <p className="mt-3 text-3xl tabular-nums">{Math.round(result.forensic.score * 100)}%</p>
+                        <p className="text-[11px] text-white/50">AI-likelihood score</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`AI-likelihood score ${Math.round(result.forensic.score * 100)} percent`}>
+                          <motion.div className={`h-full ${result.forensic.score >= 0.85 ? "bg-ember" : result.forensic.score <= 0.15 ? "bg-volt" : "bg-lime"}`}
+                            initial={{ width: 0 }} animate={{ width: `${Math.max(2, result.forensic.score * 100)}%` }} transition={{ duration: 0.9 }} />
+                        </div>
+                        <p className="mt-2 text-[11px] text-white/40">Model score, not a calibrated probability.</p>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-xs text-white/55">{result.forensic?.note || "Not used for this report."}</p>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-white/15 p-4">
+                    <p className="text-sm">Multimodal model</p>
+                    <p className="text-[11px] text-white/45">{result.modelName || "Gemini"} · visual reasoning</p>
+                    <div className="mt-3">
+                      {result.geminiCategory ? <MediaBadge category={result.geminiCategory} /> : <p className="text-xs text-white/55">Unavailable for this report.</p>}
+                    </div>
+                  </div>
+                </div>
+                {result.decisionReason && <p className="mt-3 text-xs leading-relaxed text-white/60"><span className="text-lime">Final decision:</span> {result.decisionReason}</p>}
+              </motion.div>
+
               {result.observations?.length > 0 && (
                 <motion.div variants={staggerChild}>
                   <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/50">What the model observed</p>
@@ -235,7 +266,7 @@ export default function MediaSection({ onAnalyze, loading, error, result, fromHi
 
               <motion.dl variants={staggerChild} className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-xs">
                 <div><dt className="text-white/45">File</dt><dd className="mt-0.5 truncate">{result.fileName}</dd></div>
-                <div><dt className="text-white/45">Model</dt><dd className="mt-0.5">{result.modelName || "Gemini"} (general multimodal)</dd></div>
+                <div><dt className="text-white/45">Type</dt><dd className="mt-0.5">{result.mediaType === "video" ? "Video" : "Image"} · {result.mimeType}</dd></div>
                 <div className="col-span-2 flex items-center gap-1.5 text-white/55"><Clock className="size-3.5" /> Analyzed {formatDate(result.createdAt, true)}</div>
               </motion.dl>
 
