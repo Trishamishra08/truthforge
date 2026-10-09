@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Tight Variable", "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --color-ivory: #f6f3ee;
+  --color-cream: #efe8df;
+  --color-peach: #f6dcc6;
+  --color-ink: #121212;
+  --color-ink-2: #1b1b1b;
+  --color-ink-3: #262626;
+  --color-lime: #dcf44a;
+  --color-ember: #ff7a1a;
+  --color-volt: #2f55ff;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 24px;
+}
+
+body {
+  @apply bg-cream text-ink antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 3px;
+}
+
+/* Concave corners where the ivory panel meets the black frame. */
+.inv-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+.inv-corner--ivory-tl { background: radial-gradient(circle at 0 0, transparent 17.5px, var(--color-ivory) 18px); }
+.inv-corner--ivory-tr { background: radial-gradient(circle at 100% 0, transparent 17.5px, var(--color-ivory) 18px); }
+.inv-corner--ink-tl { background: radial-gradient(circle at 0 0, transparent 17.5px, var(--color-ink) 18px); }
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -4%, 0) scale(1.06); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-drift { animation: drift 18s ease-in-out infinite; }
+.animate-marquee { animation: marquee 40s linear infinite; }
+.animate-marquee:hover { animation-play-state: paused; }
+.animate-pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+.skeleton {
+  background: linear-gradient(90deg, #ece6dd 0px, #f7f3ec 160px, #ece6dd 320px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton-dark {
+  background: linear-gradient(90deg, #232323 0px, #2e2e2e 160px, #232323 320px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.motion-off *, .motion-off *::before, .motion-off *::after {
+  animation-play-state: paused !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-drift, .animate-marquee, .animate-pulse-dot { animation: none; }
+}

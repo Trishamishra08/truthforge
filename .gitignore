@@ -1,0 +1,13 @@
+node_modules/
+dist/
+
+# Secrets — never commit real env files
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+
+# Third-party design reference video (not ours to redistribute)
+*.mp4
